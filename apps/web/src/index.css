@@ -1,0 +1,139 @@
+@import 'katex/dist/katex.min.css';
+
+@font-face {
+  font-family: 'Galmuri11';
+  src: url('galmuri/dist/Galmuri11.woff2') format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Galmuri11';
+  font-weight: 700;
+  src: url('galmuri/dist/Galmuri11-Bold.woff2') format('woff2');
+  font-display: swap;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-scale: 1;
+  color-scheme: light;
+}
+
+html {
+  font-size: calc(16px * var(--font-scale));
+}
+
+body {
+  @apply bg-cream font-body text-ink antialiased;
+  background-image: radial-gradient(rgba(155, 131, 230, 0.08) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+h1,
+h2,
+h3,
+.font-pixel {
+  font-family: 'Galmuri11', system-ui, sans-serif;
+  letter-spacing: 0;
+}
+
+:focus-visible {
+  outline: 3px solid #9b83e6;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.pixelated {
+  image-rendering: pixelated;
+  shape-rendering: crispEdges;
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border-2 border-ink/80 bg-white shadow-pixel;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg border-2 border-ink/80 px-4 py-2 font-pixel text-sm font-bold shadow-pixel transition active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-lavender text-ink hover:bg-lavender-deep hover:text-white;
+  }
+  .btn-pink {
+    @apply btn bg-pink text-ink hover:bg-pink-deep hover:text-white;
+  }
+  .btn-mint {
+    @apply btn bg-mint text-ink hover:bg-mint-deep hover:text-white;
+  }
+  .btn-ghost {
+    @apply btn bg-white text-ink hover:bg-lavender-soft;
+  }
+  .btn-sm {
+    @apply px-2.5 py-1 text-xs;
+  }
+  .input {
+    @apply w-full rounded-lg border-2 border-ink/40 bg-white px-3 py-2 text-ink placeholder:text-ink-faint focus:border-lavender-deep focus:outline-none;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full border border-ink/30 px-2 py-0.5 text-xs font-semibold;
+  }
+  .label {
+    @apply mb-1 block text-sm font-bold text-ink;
+  }
+}
+
+/* 애니메이션 — '애니메이션 줄이기' 설정 또는 OS 설정이면 끈다 */
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1px); }
+}
+@keyframes blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+@keyframes sway {
+  0%, 100% { transform: rotate(-2deg); }
+  50% { transform: rotate(2deg); }
+}
+.anim-bob { animation: bob 1.6s steps(2) infinite; }
+.anim-blink { animation: blink 4s infinite; transform-origin: center; transform-box: fill-box; }
+.anim-twinkle { animation: twinkle 2.4s ease-in-out infinite; }
+.anim-sway { animation: sway 3s ease-in-out infinite; transform-origin: bottom center; transform-box: fill-box; }
+
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation: none !important;
+  transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.flip-card { perspective: 1200px; }
+.flip-inner { transition: transform 0.45s; transform-style: preserve-3d; }
+.flip-inner.flipped { transform: rotateY(180deg); }
+.flip-face { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.flip-back { transform: rotateY(180deg); }
+
+mark.evidence {
+  background: #ffeea0;
+  border-bottom: 2px solid #e8c13d;
+  padding: 0 2px;
+  border-radius: 3px;
+}
+
+.sr-only-focusable:focus {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  clip: auto !important;
+}

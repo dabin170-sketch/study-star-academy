@@ -1,0 +1,13 @@
+{
+  "name": "공부별 아카데미",
+  "short_name": "공부별",
+  "description": "강의 자료로 공부·복습·시험까지 한 곳에서",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fffaf0",
+  "theme_color": "#ddd0ff",
+  "lang": "ko",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "name": "study-star-academy",
+  "private": true,
+  "version": "2.0.0",
+  "description": "공부별 아카데미 2.0 — 무료로 쓰는 PDF 기반 학습·시험·게임 통합 웹 플랫폼",
+  "type": "module",
+  "workspaces": [
+    "packages/shared",
+    "packages/learning-engine",
+    "packages/document-parser",
+    "apps/server",
+    "apps/web"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "npm run dev -w apps/web",
+    "dev:server": "npm run dev -w apps/server",
+    "build": "npm run build -w apps/server && npm run build -w apps/web",
+    "build:web": "npm run build -w apps/web",
+    "build:server": "npm run build -w apps/server",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:e2e": "playwright test",
+    "preview": "npm run preview -w apps/web"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

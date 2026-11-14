@@ -1,0 +1,56 @@
+# 공부별 아카데미 — Render Blueprint
+# 1) study-star-web    : 정적 사이트(무료). 모든 개인 학습 기능은 이것만으로 동작한다.
+# 2) study-star-server : 실시간 스터디(친구 광장) 전용 Web Service(Free 플랜).
+# GitHub Actions(.github/workflows/ci.yml)의 검사가 통과한 커밋만 자동 배포된다(autoDeployTrigger: checksPass).
+services:
+  - type: web
+    runtime: static
+    name: study-star-web
+    buildCommand: npm ci && npm run build -w apps/web
+    staticPublishPath: apps/web/dist
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # 서버 배포 후 https://study-star-server.onrender.com 처럼 실제 주소를 넣고 다시 배포한다.
+      - key: VITE_SERVER_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache
+
+  - type: web
+    runtime: node
+    name: study-star-server
+    plan: free
+    buildCommand: npm ci && npm run build -w apps/server
+    startCommand: node apps/server/dist/index.js
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # 정적 사이트 주소(쉼표로 여러 개). 예: https://study-star-web.onrender.com
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: MAX_ROOMS
+        value: "200"
+      - key: LOG_LEVEL
+        value: info
