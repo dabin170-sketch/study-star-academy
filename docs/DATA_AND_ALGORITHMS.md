@@ -21,9 +21,15 @@
 | blankReviews | BlankReviewAttempt(개념별 판정) | |
 | xpEvents, achievements, inventory | 보상(고유 sourceKey), 업적, 장식 | |
 | rooms | 친구 광장 복구 정보 | |
+| storyProjects | StoryProject(에피소드 전체, 형식·컷 레이아웃, 개념 스냅숏) | Document 1:N StoryProject |
+| castCustomizations | CastCustomization(캐릭터 이름·색 변경) | |
+| playbackProgress | PlaybackProgress(마지막 장면·선택 기록·완료 여부) | StoryProject 1:1 |
 
 ### 삭제 정책
 자료를 지우면 원본·문단·개념·근거·자동 생성 카드/문항·그 문항의 오답이 지워지고, **정답 기록·복습 기록·공부 시간은 통계를 위해 남습니다.** 직접 만든 문항은 출처 연결만 끊깁니다. 개념을 ‘제외’하면 자동 문항은 지우고 카드는 기록 보존을 위해 ‘보류’ 처리합니다.
+
+### 이야기 극장 데이터 이전(비파괴)
+DB `version(2)`는 위 세 테이블을 **추가만** 하고 기존 테이블은 건드리지 않습니다. 백업 형식은 v3이며, v2 백업을 가져오면 `migrateV2toV3`가 빈 테이블을 채워 넣습니다(테스트 포함).
 
 ### 스키마 변경
 Dexie `version(n+1).stores(...).upgrade(...)`로 옮기고, 백업 형식은 `packages/shared/src/backup.ts`의 `MIGRATIONS`에 단계를 추가합니다(테스트 포함).
@@ -69,3 +75,12 @@ REST: `GET /health`, `POST /api/rooms`, `POST /api/rooms/:code/join`, `GET /api/
 Socket.IO: `room:join`, `room:reconnect`, `room:leave`, `room:participant-update`, `room:state`, `room:error`, `timer:start|pause|resume|reset|sync`, `quiz:start`, `quiz:answer`, `quiz:result`
 
 공부 시간은 `누적 시간 + (서버 현재 시각 − 공부 시작 시각)`으로 계산하고, 클라이언트는 서버 시각과의 차이를 보정해 표시합니다. 상태에는 순번(seq)이 있어 늦게 도착한 오래된 상태를 버립니다.
+
+## 8. 이야기 극장(`packages/learning-engine/src/story`, `packages/animation-engine`)
+
+- **생성**: 선택한 개념마다 사건 → 오해 → 시도 → 결과 → 선택(정답/오답 피드백 장면) → 단서 → 이해 → 해결 뼈대를 만들고, 마지막에 요약·결말을 붙입니다. 피드백 장면은 다음 본편 장면으로 합류합니다. 시드 난수로 배역·대사 변형을 고릅니다.
+- **대사 구분**: `source`(원문 그대로 + 근거), `derived`(원문의 용어·핵심어로 만든 요약 + 근거), `fiction`(이야기 설정). 화면에 노란색/파란색/보라색 표시로 구분합니다.
+- **검증**(`validateEpisode`): 근거 없음, 원문 대사 수정, 인용 불일치, 자료 변경, 개념 삭제, 정답 개수, 끊긴 링크, 도달 불가 장면, 순환, 결말 없음, 정답 충돌.
+- **리그**: 고정 관절 위치(어깨·팔꿈치·손목·엉덩이·무릎·발목) 순운동학. 뼈 길이는 모든 동작·시각에서 일정하고(테스트), 각도는 관절 범위로 제한합니다. 동작 전환은 300ms 보간.
+- **카메라**: SVG viewBox 이동, 흔들림 최대 3px.
+- **함께 보기 프로토콜**: `play:load`(방장, 에피소드 ≤ 300KB) → 서버가 `play:episode` 방송, `play:control {sceneId, lineIndex, playing, elapsedMs}`(방장만), `play:vote`(참가자당 1표, 변경 가능, 20초 또는 전원 투표 시 결정, 다수결·동점은 방장 표), `play:stop`. 재접속하면 서버가 현재 에피소드를 다시 보냅니다.

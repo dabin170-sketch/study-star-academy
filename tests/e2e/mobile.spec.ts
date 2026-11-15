@@ -18,3 +18,17 @@ test('12. 모바일 화면에서 온보딩·하단 메뉴·카드 복습·퀴즈
   await page.goto('/');
   await page.screenshot({ path: 'test-results/mobile-home.png', fullPage: true });
 });
+
+test('이야기 극장 13. 모바일에서 만화·애니메이션 실행', async ({ page }) => {
+  const { createStory, skipAndSample } = await import('./theater-helpers');
+  await skipAndSample(page);
+  const id = await createStory(page, { terms: ['정적 강화', '부적 강화'] });
+  await page.getByRole('button', { name: '재생' }).click();
+  await expect(page.getByTestId('stage')).toBeVisible();
+  await page.getByRole('button', { name: '다음 대사' }).click();
+  await page.goto(`/theater/${id}/comic`);
+  await expect(page.getByTestId('comic-panel')).toHaveCount(4);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: 'test-results/mobile-comic.png', fullPage: true });
+});

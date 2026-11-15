@@ -27,6 +27,9 @@ import {
   type StudySubject,
   type UserProfile,
   type XpEvent,
+  type StoryProject,
+  type CastCustomization,
+  type PlaybackProgress,
 } from '@academy/shared';
 
 export interface BlobRow {
@@ -69,6 +72,9 @@ export class AcademyDB extends Dexie {
   rooms!: Table<StudyRoomLocal, string>;
   inventory!: Table<InventoryItem, string>;
   meta!: Table<MetaRow, string>;
+  storyProjects!: Table<StoryProject, string>;
+  castCustomizations!: Table<CastCustomization, string>;
+  playbackProgress!: Table<PlaybackProgress, string>;
 
   constructor(name = 'study-star-academy') {
     super(name);
@@ -97,6 +103,12 @@ export class AcademyDB extends Dexie {
       rooms: 'id, code',
       inventory: 'id, itemKey',
       meta: 'key',
+    });
+    // v2: 이야기 극장 테이블 추가. 기존 테이블은 바꾸지 않으므로 기존 데이터는 그대로 남는다.
+    this.version(2).stores({
+      storyProjects: 'id, documentId, subjectId, updatedAt',
+      castCustomizations: 'id, &castId',
+      playbackProgress: 'id, projectId, updatedAt',
     });
   }
 }

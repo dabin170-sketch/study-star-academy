@@ -25,6 +25,13 @@ describe('migrateBackup', () => {
     expect(f.sched.difficulty).toBeCloseTo(1, 5);
   });
 
+  it('v2 백업은 이야기 극장 테이블이 빈 채로 v3가 된다', () => {
+    const out = migrateBackup({ app: 'study-star-academy', backupVersion: 2, exportedAt: '', tables: { concepts: [{ id: 'c', statement: 'x' }] } });
+    expect(out.backupVersion).toBe(3);
+    expect(out.tables.storyProjects).toEqual([]);
+    expect(out.tables.concepts).toHaveLength(1);
+  });
+
   it('다른 앱의 파일과 미래 버전을 거부한다', () => {
     expect(() => migrateBackup({ app: 'x', backupVersion: 1, tables: {} })).toThrow(BackupError);
     expect(() =>

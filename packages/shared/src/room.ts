@@ -73,6 +73,43 @@ export const quizAnswerSchema = z.object({
   submissionId: z.string().uuid(),
 });
 
+/** 함께 보기: 에피소드(대본 JSON)는 원본 자료가 아니라 이야기 대본만 보낸다. 최대 300KB. */
+export const PLAY_EPISODE_MAX_BYTES = 300_000;
+export const playLoadSchema = z.object({
+  title: z.string().trim().min(1).max(80),
+  episode: z
+    .object({ startSceneId: z.string().min(1).max(64), scenes: z.array(z.object({ id: z.string().min(1).max(64) }).passthrough()).min(1).max(200) })
+    .passthrough()
+    .refine((e) => JSON.stringify(e).length <= PLAY_EPISODE_MAX_BYTES, '대본이 너무 큽니다.'),
+});
+export const playControlSchema = z.object({
+  sceneId: z.string().min(1).max(64),
+  lineIndex: z.number().int().min(0).max(500),
+  playing: z.boolean(),
+  /** 이미 진행한 시간(ms) — 서버가 시작 시각을 계산 */
+  elapsedMs: z.number().min(0).max(600_000).default(0),
+});
+export const playVoteSchema = z.object({ sceneId: z.string().min(1).max(64), optionId: z.string().min(1).max(80) });
+
+export type PlayLoadInput = z.infer<typeof playLoadSchema>;
+export type PlayControlInput = z.infer<typeof playControlSchema>;
+export type PlayVoteInput = z.infer<typeof playVoteSchema>;
+
+export interface PublicPlayback {
+  title: string;
+  /** 같은 에피소드인지 확인하는 순번 */
+  version: number;
+  sceneId: string;
+  lineIndex: number;
+  playing: boolean;
+  /** 현재 대사 시작 시각(서버 시각) */
+  lineStartedAt: number;
+  /** 현재 장면 투표 현황 */
+  votes: { sceneId: string; counts: Record<string, number>; voters: string[]; deadline: number } | null;
+  /** 투표로 정해진 결과 */
+  decision: { sceneId: string; optionId: string; counts: Record<string, number> } | null;
+}
+
 export type CreateRoomInput = z.infer<typeof createRoomSchema>;
 export type JoinRoomInput = z.infer<typeof joinRoomSchema>;
 export type AuthInput = z.infer<typeof authSchema>;
@@ -128,6 +165,7 @@ export interface RoomState {
   participants: PublicParticipant[];
   focus: FocusTimerState;
   quiz: PublicQuizState | null;
+  playback: PublicPlayback | null;
   /** 이벤트 순번 — 클라이언트가 오래된 상태를 버리는 데 사용 */
   seq: number;
 }

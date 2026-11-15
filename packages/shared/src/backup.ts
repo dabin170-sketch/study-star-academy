@@ -6,13 +6,14 @@
  *       flashcards에 `due`, `interval`, `ease`(SM-2 계열) 필드.
  *  v2 : concepts.definition → statement, status/confidence/userNote 추가.
  *       flashcards는 FSRS 스케줄 상태(sched)로 변환.
+ *  v3 : 이야기 극장 테이블(storyProjects, castCustomizations, playbackProgress) 추가.
+ *       기존 데이터는 그대로 두며, v2 백업은 새 테이블이 빈 상태로 올라온다.
  *
  * 마이그레이션은 데이터를 지우지 않는다. 알 수 없는 필드는 그대로 둔다.
  */
-import { SCHEMA_VERSION } from './types';
 
 export const BACKUP_APP_ID = 'study-star-academy';
-export const BACKUP_VERSION = SCHEMA_VERSION;
+export const BACKUP_VERSION = 3;
 
 export const BACKUP_TABLES = [
   'profile',
@@ -37,6 +38,9 @@ export const BACKUP_TABLES = [
   'achievements',
   'rooms',
   'inventory',
+  'storyProjects',
+  'castCustomizations',
+  'playbackProgress',
 ] as const;
 
 export type BackupTable = (typeof BACKUP_TABLES)[number];
@@ -95,8 +99,14 @@ function migrateV1toV2(file: BackupFile): BackupFile {
   return { ...file, backupVersion: 2, tables };
 }
 
+function migrateV2toV3(file: BackupFile): BackupFile {
+  // 새 테이블만 추가된 변경이라 기존 행은 건드리지 않는다.
+  return { ...file, backupVersion: 3, tables: { storyProjects: [], castCustomizations: [], playbackProgress: [], ...file.tables } };
+}
+
 const MIGRATIONS: Record<number, (f: BackupFile) => BackupFile> = {
   1: migrateV1toV2,
+  2: migrateV2toV3,
 };
 
 /** 백업 JSON을 검증하고 현재 버전으로 올린다. */

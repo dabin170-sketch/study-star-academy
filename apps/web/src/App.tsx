@@ -25,6 +25,11 @@ const Adventure = lazy(() => import('./pages/Adventure'));
 const Dungeon = lazy(() => import('./pages/Dungeon'));
 const Plaza = lazy(() => import('./pages/Plaza'));
 const Theater = lazy(() => import('./pages/Theater'));
+const TheaterNew = lazy(() => import('./pages/TheaterNew'));
+const TheaterPlay = lazy(() => import('./pages/TheaterPlay'));
+const TheaterComic = lazy(() => import('./pages/TheaterComic'));
+const TheaterEdit = lazy(() => import('./pages/TheaterEdit'));
+const TheaterReview = lazy(() => import('./pages/TheaterReview'));
 const Settings = lazy(() => import('./pages/Settings'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
@@ -79,6 +84,11 @@ export function App() {
             <Route path="/adventure/dungeon" element={<Dungeon />} />
             <Route path="/plaza" element={<Plaza />} />
             <Route path="/theater" element={<Theater />} />
+            <Route path="/theater/new" element={<TheaterNew />} />
+            <Route path="/theater/:id/play" element={<TheaterPlay />} />
+            <Route path="/theater/:id/comic" element={<TheaterComic />} />
+            <Route path="/theater/:id/edit" element={<TheaterEdit />} />
+            <Route path="/theater/:id/review" element={<TheaterReview />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

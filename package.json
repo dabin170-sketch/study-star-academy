@@ -8,6 +8,7 @@
     "packages/shared",
     "packages/learning-engine",
     "packages/document-parser",
+    "packages/animation-engine",
     "apps/server",
     "apps/web"
   ],

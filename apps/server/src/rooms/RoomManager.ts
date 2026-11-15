@@ -10,6 +10,10 @@ import {
   ROOM_ERROR_MESSAGES,
   ROOM_MAX_PARTICIPANTS,
   type CreateRoomInput,
+  type PlayControlInput,
+  type PlayLoadInput,
+  type PlayVoteInput,
+  type PublicPlayback,
   type FocusTimerState,
   type JoinResult,
   type ParticipantUpdate,
@@ -65,12 +69,28 @@ interface Quiz {
   lastReveal?: { index: number; answerIndex: number; correctBy: string[] };
 }
 
+interface Playback {
+  title: string;
+  episode: PlayLoadInput['episode'];
+  version: number;
+  sceneId: string;
+  lineIndex: number;
+  playing: boolean;
+  lineStartedAt: number;
+  votes: { sceneId: string; byParticipant: Map<string, string>; deadline: number } | null;
+  decision: PublicPlayback['decision'];
+}
+
+/** 함께 보기 투표 제한 시간 */
+export const VOTE_WINDOW_MS = 20_000;
+
 interface Room {
   code: string;
   createdAt: number;
   participants: Map<string, Participant>;
   focus: FocusTimerState;
   quiz: Quiz | null;
+  playback: Playback | null;
   seq: number;
   lastActivity: number;
 }
@@ -122,6 +142,7 @@ export class RoomManager {
       participants: new Map(),
       focus: { phase: 'idle', durationMs: 25 * 60_000, startedAt: null, remainingMs: 25 * 60_000 },
       quiz: null,
+      playback: null,
       seq: 0,
       lastActivity: t,
     };
@@ -358,6 +379,92 @@ export class RoomManager {
     this.touch(room);
   }
 
+  /* ---------- 함께 보기(타임라인 이벤트 동기화) ---------- */
+
+  playLoad(code: string, participantId: string, input: PlayLoadInput): void {
+    const room = this.get(code);
+    this.requireHost(room, participantId);
+    room.playback = {
+      title: input.title,
+      episode: input.episode,
+      version: (room.playback?.version ?? 0) + 1,
+      sceneId: input.episode.startSceneId,
+      lineIndex: 0,
+      playing: false,
+      lineStartedAt: this.now(),
+      votes: null,
+      decision: null,
+    };
+    this.touch(room);
+  }
+
+  playEpisode(code: string) {
+    const pb = this.get(code).playback;
+    return pb ? { title: pb.title, version: pb.version, episode: pb.episode } : null;
+  }
+
+  playControl(code: string, participantId: string, input: PlayControlInput): void {
+    const room = this.get(code);
+    this.requireHost(room, participantId);
+    const pb = room.playback;
+    if (!pb) throw new RoomError('QUIZ_NOT_ACTIVE');
+    if (!pb.episode.scenes.some((s) => s.id === input.sceneId)) throw new RoomError('INVALID_INPUT');
+    if (pb.sceneId !== input.sceneId) {
+      pb.votes = null;
+      if (pb.decision?.sceneId !== input.sceneId) pb.decision = null;
+    }
+    pb.sceneId = input.sceneId;
+    pb.lineIndex = input.lineIndex;
+    pb.playing = input.playing;
+    pb.lineStartedAt = this.now() - input.elapsedMs;
+    this.touch(room);
+  }
+
+  /** 공동 선택: 참가자마다 한 표(다시 내면 바꿀 수 있음). 모두 투표하거나 시간이 지나면 다수결로 정한다. */
+  playVote(code: string, participantId: string, input: PlayVoteInput): { decided: boolean } {
+    const room = this.get(code);
+    if (!room.participants.has(participantId)) throw new RoomError('UNAUTHORIZED');
+    const pb = room.playback;
+    if (!pb) throw new RoomError('QUIZ_NOT_ACTIVE');
+    if (pb.decision?.sceneId === input.sceneId) return { decided: true };
+    const scene = pb.episode.scenes.find((s) => s.id === input.sceneId) as { choice?: { options?: { id: string }[] } } | undefined;
+    const valid = scene?.choice?.options?.some((o) => o.id === input.optionId);
+    if (!valid || pb.sceneId !== input.sceneId) throw new RoomError('INVALID_INPUT');
+    if (!pb.votes || pb.votes.sceneId !== input.sceneId) pb.votes = { sceneId: input.sceneId, byParticipant: new Map(), deadline: this.now() + VOTE_WINDOW_MS };
+    pb.votes.byParticipant.set(participantId, input.optionId);
+    this.touch(room);
+    const voters = [...room.participants.values()].filter((p) => p.connected || p.socketIds.size > 0);
+    const everyone = voters.length ? voters : [...room.participants.values()];
+    if (everyone.every((p) => pb.votes!.byParticipant.has(p.id))) {
+      this.decideVote(room);
+      return { decided: true };
+    }
+    return { decided: false };
+  }
+
+  private decideVote(room: Room) {
+    const pb = room.playback!;
+    const v = pb.votes!;
+    const counts: Record<string, number> = {};
+    for (const opt of v.byParticipant.values()) counts[opt] = (counts[opt] ?? 0) + 1;
+    const max = Math.max(...Object.values(counts));
+    const tied = Object.keys(counts).filter((k) => counts[k] === max);
+    // 동점이면 방장의 표, 방장이 투표하지 않았으면 먼저 받은 표
+    const host = [...room.participants.values()].find((p) => p.isHost);
+    const hostVote = host ? v.byParticipant.get(host.id) : undefined;
+    const optionId = hostVote && tied.includes(hostVote) ? hostVote : [...v.byParticipant.values()].find((o) => tied.includes(o))!;
+    pb.decision = { sceneId: v.sceneId, optionId, counts };
+    pb.votes = null;
+    this.touch(room);
+  }
+
+  playStop(code: string, participantId: string): void {
+    const room = this.get(code);
+    this.requireHost(room, participantId);
+    room.playback = null;
+    this.touch(room);
+  }
+
   /** 주기적으로 호출: 시간 초과 문항 진행, 오래된 방 정리. 바뀐 방 코드를 돌려준다. */
   tick(): { changed: string[]; finishedQuizzes: string[] } {
     const changed: string[] = [];
@@ -369,6 +476,10 @@ export class RoomManager {
         this.advanceQuiz(room);
         changed.push(room.code);
         if ((quiz.phase as string) === 'finished') finishedQuizzes.push(room.code);
+      }
+      if (room.playback?.votes && t > room.playback.votes.deadline && room.playback.votes.byParticipant.size > 0) {
+        this.decideVote(room);
+        changed.push(room.code);
       }
       if (room.focus.phase === 'running' && room.focus.startedAt !== null && t - room.focus.startedAt >= room.focus.remainingMs) {
         room.focus = { phase: 'idle', durationMs: room.focus.durationMs, startedAt: null, remainingMs: room.focus.durationMs };
@@ -457,6 +568,25 @@ export class RoomManager {
             answeredBy: [...(quiz.answers.get(quiz.index)?.keys() ?? [])],
             scores: Object.fromEntries(quiz.scores),
             lastReveal: quiz.lastReveal,
+          }
+        : null,
+      playback: room.playback
+        ? {
+            title: room.playback.title,
+            version: room.playback.version,
+            sceneId: room.playback.sceneId,
+            lineIndex: room.playback.lineIndex,
+            playing: room.playback.playing,
+            lineStartedAt: room.playback.lineStartedAt,
+            votes: room.playback.votes
+              ? {
+                  sceneId: room.playback.votes.sceneId,
+                  counts: [...room.playback.votes.byParticipant.values()].reduce<Record<string, number>>((a, o) => ((a[o] = (a[o] ?? 0) + 1), a), {}),
+                  voters: [...room.playback.votes.byParticipant.keys()],
+                  deadline: room.playback.votes.deadline,
+                }
+              : null,
+            decision: room.playback.decision,
           }
         : null,
       seq: room.seq,

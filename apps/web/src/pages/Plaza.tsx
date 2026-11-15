@@ -9,6 +9,7 @@ import { CHARACTERS, PixelCharacter } from '../components/PixelCharacter';
 import { ApiError, SERVER_URL, checkHealth, createRoom, joinRoom, useRoomConnection } from '../realtime/client';
 import { logSession } from '../learning/services';
 import { useCurrentSubject, useNow, useProfile } from '../hooks/data';
+import { GroupWatch } from '../features/theater/GroupWatch';
 import { toast } from '../stores/ui';
 
 const STATUS_LABEL = { studying: '공부 중', break: '휴식 중', idle: '대기' } as const;
@@ -176,6 +177,8 @@ function Room({ local, onLeft }: { local: StudyRoomLocal; onLeft: () => void }) 
           )}
         </Card>
       </div>
+
+      {s && <GroupWatch conn={conn} state={s} isHost={!!me?.isHost} myId={local.participantId} />}
 
       <Card className="space-y-3">
         <h2 className="font-bold">실시간 퀴즈 대결</h2>

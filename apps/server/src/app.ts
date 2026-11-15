@@ -9,6 +9,9 @@ import {
   focusStartSchema,
   joinRoomSchema,
   participantUpdateSchema,
+  playControlSchema,
+  playLoadSchema,
+  playVoteSchema,
   quizAnswerSchema,
   quizStartSchema,
   roomCodeSchema,
@@ -171,7 +174,7 @@ export function buildApp(config: ServerConfig, opts: { now?: () => number; logge
 
   const io = new IOServer(app.server, {
     cors: { origin: (origin, cb) => cb(null, originAllowed(origin)), methods: ['GET', 'POST'] },
-    maxHttpBufferSize: 64 * 1024,
+    maxHttpBufferSize: 400 * 1024, // 함께 보기 대본(최대 300KB)
     pingInterval: 20_000,
     pingTimeout: 20_000,
   });
@@ -214,6 +217,9 @@ export function buildApp(config: ServerConfig, opts: { now?: () => number; logge
       session = { code: a.code, participantId: a.participantId };
       socket.join(a.code);
       ack?.({ ok: true, state: manager.state(a.code) });
+      // 재입장하면 함께 보던 대본을 다시 보내 현재 장면으로 복귀시킨다
+      const ep = manager.playEpisode(a.code);
+      if (ep) socket.emit('play:episode', ep);
       broadcast(a.code);
     };
 
@@ -275,6 +281,30 @@ export function buildApp(config: ServerConfig, opts: { now?: () => number; logge
         const res = manager.results(s.code);
         if (res.finished) io.to(s.code).emit('quiz:result', res);
       }
+    });
+
+    on('play:load', playLoadSchema, (d, ack) => {
+      const s = requireSession();
+      manager.playLoad(s.code, s.participantId, d);
+      io.to(s.code).emit('play:episode', manager.playEpisode(s.code));
+      broadcast(s.code);
+      ack?.({ ok: true });
+    });
+    on('play:control', playControlSchema, (d) => {
+      const s = requireSession();
+      manager.playControl(s.code, s.participantId, d);
+      broadcast(s.code);
+    });
+    on('play:vote', playVoteSchema, (d, ack) => {
+      const s = requireSession();
+      const r = manager.playVote(s.code, s.participantId, d);
+      broadcast(s.code);
+      ack?.({ ok: true, ...r });
+    });
+    on('play:stop', null, () => {
+      const s = requireSession();
+      manager.playStop(s.code, s.participantId);
+      broadcast(s.code);
     });
 
     socket.on('disconnect', () => {

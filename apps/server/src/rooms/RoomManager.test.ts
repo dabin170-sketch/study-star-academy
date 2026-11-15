@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { REVEAL_DELAY_MS, RoomError, RoomManager, STALE_PARTICIPANT_MS, generateRoomCode } from './RoomManager';
+import { REVEAL_DELAY_MS, RoomError, RoomManager, STALE_PARTICIPANT_MS, VOTE_WINDOW_MS, generateRoomCode } from './RoomManager';
 import { ROOM_CODE_ALPHABET } from '@academy/shared';
 
 function setup() {
@@ -161,5 +161,59 @@ describe('RoomManager', () => {
     m.tick();
     expect(m.has(a.code)).toBe(false);
     expect(() => m.createRoom(who('d'))).not.toThrow();
+  });
+
+  describe('함께 보기', () => {
+    const episode = {
+      startSceneId: 's1',
+      scenes: [
+        { id: 's1', nextSceneId: 's2' },
+        { id: 's2', choice: { options: [{ id: 'a' }, { id: 'b' }] } },
+        { id: 's3' },
+      ],
+    };
+
+    it('방장만 대본을 올리고 재생 위치를 바꾸며, 위치는 서버 시각 기준으로 공유된다', () => {
+      const { m, who, clock } = setup();
+      const host = m.createRoom(who('host'));
+      const guest = m.joinRoom(host.code, who('guest'));
+      expectCode(() => m.playLoad(host.code, guest.participantId, { title: 't', episode }), 'NOT_HOST');
+      m.playLoad(host.code, host.participantId, { title: '강화 사건', episode });
+      expect(m.playEpisode(host.code)?.episode.startSceneId).toBe('s1');
+      clock.advance(1000);
+      m.playControl(host.code, host.participantId, { sceneId: 's2', lineIndex: 1, playing: true, elapsedMs: 400 });
+      const pb = m.state(host.code).playback!;
+      expect(pb).toMatchObject({ sceneId: 's2', lineIndex: 1, playing: true, title: '강화 사건' });
+      expect(pb.lineStartedAt).toBe(clock.now() - 400);
+      expect(JSON.stringify(m.state(host.code))).not.toContain('scenes'); // 상태에는 대본을 반복해서 싣지 않음
+      expectCode(() => m.playControl(host.code, guest.participantId, { sceneId: 's1', lineIndex: 0, playing: true, elapsedMs: 0 }), 'NOT_HOST');
+      expectCode(() => m.playControl(host.code, host.participantId, { sceneId: 'zz', lineIndex: 0, playing: true, elapsedMs: 0 }), 'INVALID_INPUT');
+    });
+
+    it('공동 선택은 모두 투표하면 다수결로, 동점이면 방장 표로 정하고, 시간이 지나면 받은 표로 정한다', () => {
+      const { m, who, clock } = setup();
+      const host = m.createRoom(who('host'));
+      const g1 = m.joinRoom(host.code, who('g1'));
+      const g2 = m.joinRoom(host.code, who('g2'));
+      [host, g1, g2].forEach((p, i) => m.attachSocket(host.code, p.participantId, `s${i}`));
+      m.playLoad(host.code, host.participantId, { title: 't', episode });
+      m.playControl(host.code, host.participantId, { sceneId: 's2', lineIndex: 0, playing: true, elapsedMs: 0 });
+      expectCode(() => m.playVote(host.code, g1.participantId, { sceneId: 's2', optionId: 'zz' }), 'INVALID_INPUT');
+      expect(m.playVote(host.code, g1.participantId, { sceneId: 's2', optionId: 'a' }).decided).toBe(false);
+      m.playVote(host.code, g1.participantId, { sceneId: 's2', optionId: 'b' }); // 표 바꾸기
+      m.playVote(host.code, host.participantId, { sceneId: 's2', optionId: 'a' });
+      expect(m.state(host.code).playback!.votes!.counts).toEqual({ b: 1, a: 1 });
+      expect(m.playVote(host.code, g2.participantId, { sceneId: 's2', optionId: 'b' }).decided).toBe(true);
+      expect(m.state(host.code).playback!.decision).toEqual({ sceneId: 's2', optionId: 'b', counts: { b: 2, a: 1 } });
+
+      // 시간 초과: 한 명만 투표해도 마감 후 결정
+      m.playControl(host.code, host.participantId, { sceneId: 's1', lineIndex: 0, playing: true, elapsedMs: 0 });
+      m.playControl(host.code, host.participantId, { sceneId: 's2', lineIndex: 0, playing: true, elapsedMs: 0 });
+      expect(m.state(host.code).playback!.decision).toBeNull();
+      m.playVote(host.code, g2.participantId, { sceneId: 's2', optionId: 'a' });
+      clock.advance(VOTE_WINDOW_MS + 100);
+      m.tick();
+      expect(m.state(host.code).playback!.decision?.optionId).toBe('a');
+    });
   });
 });

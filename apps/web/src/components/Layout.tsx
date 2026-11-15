@@ -16,6 +16,7 @@ const NAV = [
   { to: '/tower', label: '시험의 탑' },
   { to: '/detective', label: '탐정' },
   { to: '/observatory', label: '관측소' },
+  { to: '/theater', label: '극장' },
   { to: '/plaza', label: '광장' },
   { to: '/garden', label: '정원' },
   { to: '/settings', label: '설정' },

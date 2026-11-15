@@ -128,6 +128,21 @@ describe('실시간 서버', () => {
     expect(result.ranking[0].nickname).toBe('호스트');
     expect(result.ranking[0].score).toBeGreaterThan(100);
 
+    // 함께 보기: 방장이 대본을 올리면 모두 받고, 끊겼다 돌아온 사람도 대본과 현재 장면을 다시 받는다
+    const epPromise = waitFor<any>(sockets[2], 'play:episode');
+    await emitAck(sockets[0], 'play:load', { title: '강화 사건', episode: { startSceneId: 'a', scenes: [{ id: 'a', nextSceneId: 'b' }, { id: 'b' }] } });
+    expect((await epPromise).episode.startSceneId).toBe('a');
+    sockets[0].emit('play:control', { sceneId: 'b', lineIndex: 2, playing: true, elapsedMs: 0 });
+    await waitFor<RoomState>(sockets[1], 'room:state', (s) => s.playback?.sceneId === 'b');
+    sockets[1].close();
+    const again = client();
+    await new Promise<void>((r) => again.on('connect', () => r()));
+    const replay = waitFor<any>(again, 'play:episode');
+    const re2 = await emitAck(again, 'room:reconnect', { code: host.code, participantId: joins[1].participantId, recoveryToken: joins[1].recoveryToken });
+    expect(re2.state.playback).toMatchObject({ sceneId: 'b', lineIndex: 2 });
+    expect((await replay).title).toBe('강화 사건');
+    sockets[1] = again;
+
     sockets.forEach((s) => s.close());
   }, 15000);
 });

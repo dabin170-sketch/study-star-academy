@@ -5,7 +5,9 @@ import { createServer } from 'node:http';
 import { existsSync } from 'node:fs';
 
 const entry = 'apps/server/dist/index.js';
-if (!existsSync(entry)) execSync('npm run build -w apps/server', { stdio: 'inherit' });
+// 항상 최신 코드로 빌드한다(예전 빌드로 테스트하는 일 방지)
+execSync('npm run build -w apps/server', { stdio: 'inherit' });
+if (!existsSync(entry)) throw new Error('서버 빌드 실패');
 
 let child = null;
 function start() {

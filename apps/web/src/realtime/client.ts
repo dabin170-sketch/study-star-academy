@@ -67,6 +67,7 @@ export function useRoomConnection(local: StudyRoomLocal | null | undefined) {
   const [status, setStatus] = useState<ConnStatus>('connecting');
   const [error, setError] = useState<RoomError | null>(null);
   const [result, setResult] = useState<{ ranking: { participantId: string; nickname: string; score: number }[] } | null>(null);
+  const [playEpisode, setPlayEpisode] = useState<{ title: string; version: number; episode: unknown } | null>(null);
   const offset = useRef(0);
   const socketRef = useRef<Socket | null>(null);
   const seqRef = useRef(-1);
@@ -109,6 +110,7 @@ export function useRoomConnection(local: StudyRoomLocal | null | undefined) {
     socket.on('room:state', applyState);
     socket.on('timer:sync', (d: { serverNow: number }) => (offset.current = d.serverNow - Date.now()));
     socket.on('quiz:result', (r) => setResult(r));
+    socket.on('play:episode', (e) => setPlayEpisode(e));
     socket.on('room:error', (e: RoomError) => {
       if (e.code === 'ROOM_NOT_FOUND' || e.code === 'UNAUTHORIZED') {
         setStatus('room-lost');
@@ -160,6 +162,11 @@ export function useRoomConnection(local: StudyRoomLocal | null | undefined) {
     focusReset: () => emit('timer:reset'),
     quizStart: (input: QuizStartInput) => emit('quiz:start', input),
     answer,
+    playEpisode,
+    playLoad: (title: string, episode: unknown) => emit('play:load', { title, episode }),
+    playControl: (sceneId: string, lineIndex: number, playing: boolean, elapsedMs: number) => emit('play:control', { sceneId, lineIndex, playing, elapsedMs: Math.max(0, Math.min(600_000, Math.round(elapsedMs))) }),
+    playVote: (sceneId: string, optionId: string) => emit('play:vote', { sceneId, optionId }),
+    playStop: () => emit('play:stop'),
     leave: () => new Promise<void>((resolve) => {
       const s = socketRef.current;
       if (!s?.connected) return resolve();

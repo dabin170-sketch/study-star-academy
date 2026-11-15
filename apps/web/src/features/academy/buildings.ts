@@ -24,5 +24,5 @@ export const BUILDINGS: Building[] = [
   { id: 'garden', name: '성장 정원', role: '경험치 · 성취', route: '/garden', status: 'ready', roof: '#4fbf93', wall: '#fff8d6', col: 3, row: 1 },
   { id: 'adventure', name: '모험 훈련장', role: '게임형 학습', route: '/adventure', status: 'partial', roof: '#e8c13d', wall: '#fff8d6', col: 0, row: 2, note: '개념 던전 플레이 가능, 나머지 게임은 개발 예정' },
   { id: 'plaza', name: '친구 광장', role: '4인 실시간 스터디', route: '/plaza', status: 'ready', roof: '#f08fb0', wall: '#eaf5ff', col: 1, row: 2, note: '실시간 서버 연결 필요' },
-  { id: 'theater', name: '이야기 극장', role: '만화 · 스토리 학습', route: '/theater', status: 'planned', roof: '#b9b0c6', wall: '#f4f1f7', col: 2, row: 2 },
+  { id: 'theater', name: '이야기 극장', role: '학습 만화 · 애니메이션', route: '/theater', status: 'ready', roof: '#b48be0', wall: '#f4f1f7', col: 2, row: 2, note: '역할극·AI 확장 모드는 개발 예정' },
 ];
